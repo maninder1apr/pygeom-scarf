@@ -12,7 +12,7 @@ from pygeomtools.materials import LegendMaterialRegistry
 
 from pygeomscarf.pen_enclosures import (
     PEN_ENCLOSURES,
-    build_pen_polycone,
+    build_pen_shape,
 )
 from pygeomscarf.utils import _place_pv
 
@@ -201,6 +201,36 @@ def set_tpb_surface(tpb_name: str, lar_name: str, reg: geant4.Registry):
     )
 
 
+def set_pen_surface(pen_name: str, lar_name: str, reg: geant4.Registry):
+
+    lar_to_pen = geant4.solid.OpticalSurface(
+        f"surface_lar_to_{pen_name}",
+        finish="ground",
+        model="unified",
+        surf_type="dielectric_dielectric",
+        value=0.1,
+        registry=reg,
+    )
+
+    lar_pv = reg.physicalVolumeDict[lar_name]
+    pen_pv = reg.physicalVolumeDict[pen_name]
+
+    geant4.BorderSurface(
+        f"bsurface_lar_pen_{pen_name}",
+        lar_pv,
+        pen_pv,
+        lar_to_pen,
+        reg,
+    )
+    geant4.BorderSurface(
+        f"bsurface_pen_lar_{pen_name}",
+        pen_pv,
+        lar_pv,
+        lar_to_pen,
+        reg,
+    )
+
+
 def set_fiber_core_surface(tpb_name: str, core_name: str, reg: geant4.Registry):
     """Set the fiber core surface (to make sensitive).
 
@@ -244,43 +274,6 @@ def build_strings(
     lar_height: float,
     fiber_shroud: dict | None = None,
 ) -> pyg4ometry.geant4.Registry:
-    """Build the strings and place them into the registry.
-
-    Parameters
-    ----------
-    lar_lv
-        The logical volume of the liquid argon, to place the strings inside.
-    hpges
-        A mapping containing the HPGe detector information, including their names and positions.
-
-        Should have the following structure:
-
-        .. code-block:: yaml
-
-            - name: "V09999A
-                position_from_cryostat_bottom_in_mm: 120
-            - name: "V09999B
-                position_from_cryostat_bottom_in_mm: 230
-    mats
-        The material registry to use for constructing the strings.
-    det_meta
-        The metadata containing the information on the detectors.
-    reg
-        The registry to add the strings to.
-
-    fiber_shroud
-        A dictionary containing the fiber shroud information, including its mode
-        (e.g. "simplified" or "detailed"), height, radius and position from the bottom of the cryostat.
-        Should have the following structure:
-
-        .. code-block:: yaml
-
-            mode: "simplified"  # or "detailed"
-            height_in_mm: 1200
-            radius_in_mm: 200
-            center_pos_from_cryostat_bottom_in_mm: 120
-
-    """
 
     for uid, hpge in enumerate(hpges):
         name = hpge["name"]
@@ -310,13 +303,22 @@ def build_strings(
             # TEMP: detector type (adjust if metadata supports it)
             det_type = hpge_meta["type"].lower()
 
+            if det_type not in PEN_ENCLOSURES:
+                msg = (
+                    f"PEN enclosure not defined for detector type '{det_type}'. "
+                    f"Available types: {list(PEN_ENCLOSURES)}"
+                )
+                raise ValueError(msg)
+
             enc_dims = PEN_ENCLOSURES[det_type].copy()
             z_offset = enc_dims.pop("z_offset_mm")
+            shape = pen_cfg.get("shape", "flat")
 
-            pen_solid = build_pen_polycone(
+            pen_solid = build_pen_shape(
+                shape,
                 f"pen_{name}",
-                registry=reg,
-                **enc_dims,
+                det_type,
+                reg,
             )
 
             pen_lv = geant4.LogicalVolume(
@@ -341,7 +343,7 @@ def build_strings(
                 200 + uid,
                 {"name": f"PEN_{name}"},
             )
-            set_tpb_surface(tpb_name=f"pen_{name}", lar_name="lar", reg=reg)
+            set_pen_surface(pen_name=f"pen_{name}", lar_name="lar", reg=reg)
 
     if fiber_shroud is not None:
         mode = fiber_shroud.get("mode", "simplified")

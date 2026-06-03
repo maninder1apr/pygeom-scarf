@@ -38,13 +38,13 @@ def test_pen_enclosure_wrapper(det_type):
     ("det_type", "det_r", "det_h"),
     [
         ("bege", 37.0, 32.0),
-        ("icpc", 39.0, 65.0),
+        ("icpc", 40.0, 65.0),
     ],
 )
 def test_pen_fits_detector(det_type, det_r, det_h):
     p = PEN_ENCLOSURES[det_type]
     assert p["body_outer_r_mm"] > p["body_inner_r_mm"]
-    assert p["body_inner_r_mm"] <= det_r
+    assert p["body_inner_r_mm"] >= det_r  # inner radius must be >= HPGe radius
     assert p["body_h_mm"] - 2 * p["cap_t_mm"] > 0
 
 
