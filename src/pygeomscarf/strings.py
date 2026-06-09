@@ -10,10 +10,7 @@ from pygeomhpges import make_hpge
 from pygeomtools.detectors import RemageDetectorInfo
 from pygeomtools.materials import LegendMaterialRegistry
 
-from pygeomscarf.pen_enclosures import (
-    PEN_ENCLOSURES,
-    build_pen_shape,
-)
+from pygeomscarf.pen_enclosures import PEN_ENCLOSURES, build_pen_shape
 from pygeomscarf.utils import _place_pv
 
 u = pint.get_application_registry()
@@ -310,15 +307,14 @@ def build_strings(
                 )
                 raise ValueError(msg)
 
-            enc_dims = PEN_ENCLOSURES[det_type].copy()
-            z_offset = enc_dims.pop("z_offset_mm")
             shape = pen_cfg.get("shape", "flat")
-
+            z_offset = hpge_meta["geometry"]["height_in_mm"] / 2.0
             pen_solid = build_pen_shape(
                 shape,
                 f"pen_{name}",
                 det_type,
                 reg,
+                hpge_meta,
             )
 
             pen_lv = geant4.LogicalVolume(
